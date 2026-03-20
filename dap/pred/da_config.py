@@ -5,7 +5,7 @@ import os
 from pandas.io.common import file_exists
 
 # from logging import raiseExceptions
-from dao.lib.db_manager import DBmanagerObj
+from dap.lib.db_manager import DBmanagerObj
 import sqlalchemy_utils
 
 

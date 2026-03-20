@@ -19,7 +19,7 @@ import json
 import requests
 
 from da_config import Config
-from dao.lib.da_prices import DaPrices
+from dap.lib.da_prices import DaPrices
 
 # ML imports
 from xgboost import XGBRegressor
@@ -135,7 +135,7 @@ class DAPredictor:
         self.forecast_hours: int = 96
         self.config = Config(file_name, secrets_file_name="../data/secrets.json")
         self.config.interval = "1hour"
-        self.ned_nl_api_key = self.config.get(["ned_nl", "api_token"], None, None)
+        self.ned_nl_api_key = token = os.getenv("ned_nl_api_token")
         self.db_da = self.config.get_db_da("database_dap")
 
     def _fetch_ned_nl_data(
@@ -1225,7 +1225,7 @@ class DAPredictor:
 
     def show_prediction(self, start, end):
         prediction, result_df = self.predict_da_price(start, end)
-        from dao.lib.da_graph import GraphBuilder
+        from dap.lib.da_graph import GraphBuilder
 
         result_df["time"] = pd.to_datetime(result_df.index).tz_convert(
             tz="Europe/Amsterdam"
@@ -1313,7 +1313,7 @@ class DAPredictor:
         plot = g_builder.build(result_df, graph_options)
         now = dt.datetime.now()
         plot.savefig(
-            f"../data/images/da_prediction_{now.strftime('%Y-%m-%d %H:%M')}.png"
+            f"data/images/da_prediction_{now.strftime('%Y-%m-%d %H:%M')}.png"
         )
         return plot
 
