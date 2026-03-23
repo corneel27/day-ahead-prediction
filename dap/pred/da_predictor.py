@@ -113,7 +113,7 @@ class DAPredictor:
         """
         self.file_name = file_name
         self.random_state = random_state
-        self.model_save_path = "data/da_prediction.pkl"
+        self.model_save_path = "../data/da_prediction.pkl"
         self.model = None
         self.log_level = logging.INFO
         logging.getLogger().setLevel(self.log_level)
@@ -564,9 +564,21 @@ class DAPredictor:
                         df.loc[df.shape[0]] = values
                 self.db_da.savedata(df, "values")
 
-    def update_prices(self, start: dt.datetime):
-        da_prices = DaPrices(self.config, self.db_da)
-        da_prices.get_prices("nordpool", _start=start)
+    def update_prices(self):
+        latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
+        now_dt = dt.datetime.now()
+        shoud_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
+        if now_dt.hour >= 13:
+            shoud_latest_dt +=  dt.timedelta(days=1)
+        if shoud_latest_dt <= latest_dt:
+            logging.info(f"Actual Day Ahead prices are present until {latest_dt}. "
+                         f"Er worden geen prijzen opgehaald")
+        while shoud_latest_dt > latest_dt:
+            get_date = dt.datetime(latest_dt.year, latest_dt.month, latest_dt.day) + dt.timedelta(days=1)
+            da_prices = DaPrices(self.config, self.db_da)
+            da_prices.get_prices("nordpool", _start=get_date)
+            latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
+
 
     def _create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -1313,7 +1325,7 @@ class DAPredictor:
         plot = g_builder.build(result_df, graph_options)
         now = dt.datetime.now()
         plot.savefig(
-            f"data/images/da_prediction_{now.strftime('%Y-%m-%d %H:%M')}.png"
+            f"../data/images/da_prediction_{now.strftime('%Y-%m-%d %H:%M')}.png"
         )
         return plot
 
@@ -1333,7 +1345,7 @@ def main():
         end_dt = dt.datetime.strptime(arg3, "%Y-%m-%d")
     else:
         end_dt = start_dt + dt.timedelta(days=7)
-    da_predictor = DAPredictor(file_name="data/options_dap.json")
+    da_predictor = DAPredictor(file_name="../data/options_dap.json")
     if arg.lower() == "train":
         da_predictor.run_train()
     if arg.lower() == "predict":
@@ -1348,10 +1360,7 @@ def main():
         da_predictor.update_data(classification=CLASSIFICATION_CURRENT)
         da_predictor.update_data(classification=CLASSIFICATION_FORECAST)
         da_predictor.updata_gasprices()
-        da_predictor.update_prices(
-            dt.datetime(start_dt.year, start_dt.month, start_dt.day)
-            + dt.timedelta(days=1)
-        )
+        da_predictor.update_prices()
         da_predictor.run_train()
         da_predictor.show_prediction(start=start_dt, end=end_dt)
     if arg.lower() == "show":

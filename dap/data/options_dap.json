@@ -2,7 +2,7 @@
   "time_zone": "Europe/Amsterdam",
   "database_dap": {
     "engine": "sqlite",
-    "db_path": "data",
+    "db_path": "../data",
     "database": "day_ahead_pred.db"
   },
   "tibber": {

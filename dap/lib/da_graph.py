@@ -351,13 +351,8 @@ class GraphBuilder:
                     )
                     / 10
                 )
-                if ylim > 0:
-                    if np.min(stacked_neg) < 0:
-                        ax.set_ylim([-ylim, ylim])
-                    else:
-                        ax.set_ylim([0, ylim])
-                else:
-                    ax.set_ylim([min(0, ymin_left), ymax_left])
+                bottom, ceil = ax.get_ylim()
+                ax.set_ylim([bottom, ceil])
                 ax.set_ylabel(g_options["vaxis"][0]["title"])
 
             ax.legend(

@@ -22,6 +22,6 @@ dao/data/*.csv
 dao/data/options_unversioned.json
 dao/pred/data/da_prediction.pkl
 dao/data/options_new.json
-dap/pred/data/da_prediction.pkl
-dap/pred/data/da_prediction.pkl
-/dap/pred/data/images
+dap/data/da_prediction.pkl
+dap/data/da_prediction.pkl
+/dap/data/images
