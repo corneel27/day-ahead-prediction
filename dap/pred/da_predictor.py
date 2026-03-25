@@ -1166,7 +1166,7 @@ class DAPredictor:
         now = dt.datetime.today()
 
         end = now
-        start = end - dt.timedelta(days=180)
+        start = end - dt.timedelta(days=365)
         """
         start = now
         end = now + dt.timedelta(days=6)
