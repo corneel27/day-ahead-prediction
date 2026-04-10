@@ -32,7 +32,7 @@ warnings.filterwarnings("ignore")
 
 # constants
 API_URL = "https://api.ned.nl/v1/utilizations"
-CONF_FORECAST_HOURS = 120
+CONF_FORECAST_HOURS = 144
 # NED API Data Types
 DATA_TYPE_WIND_ONSHORE = 1
 DATA_TYPE_SOLAR = 2
@@ -48,6 +48,7 @@ ACTIVITY_PRODUCTION = 1
 ACTIVITY_CONSUMPTION = 2
 
 # NED API Granularity
+GRANULARITY_15MIN = 4
 GRANULARITY_HOURLY = 5
 GRANULARITY_TIMEZONE_CET = 1
 
@@ -135,8 +136,10 @@ class DAPredictor:
         self.forecast_hours: int = 96
         self.config = Config(file_name, secrets_file_name="../data/secrets.json")
         self.config.interval = "1hour"
-        self.ned_nl_api_key = token = os.getenv("ned_nl_api_token")
+        self.ned_nl_api_key = os.getenv("ned_nl_api_token")
         self.db_da = self.config.get_db_da("database_dap")
+        self.time_zone = self.config.get("time_zone", None, 'Europe/Amsterdam')
+        self.knmi_station = self.config.get("knmi_station", None, '260')
 
     def _fetch_ned_nl_data(
         self,
@@ -210,6 +213,7 @@ class DAPredictor:
                 logging.warning("No data returned for type %s", type_id)
                 return []
 
+            tijd = start_date
             save_df = pd.DataFrame(columns=["time", "tijd", "code", "value"])
             for record in records:
                 tijd = pd.to_datetime(record["validfrom"])
@@ -225,7 +229,7 @@ class DAPredictor:
             return tijd
 
         except ConnectionError as ex:
-            logging.exception("Unexpected error fetching data for type %s", type_id)
+            logging.exception("Unexpected error fetching data for type %s", type_id, ex)
             return None
 
     def update_data(self, classification: int, tot: dt.datetime = None):
@@ -243,7 +247,6 @@ class DAPredictor:
                     data["code"], latest=True, table_name=table
                 )
             else:
-                table = "prognoses"
                 latest_record = dt.datetime.now() - dt.timedelta(days=1)
             if latest_record is None:
                 if classification == CLASSIFICATION_CURRENT:
@@ -278,7 +281,7 @@ class DAPredictor:
         """
         haalt data op bij knmi en slaat deze op in dao-database
         :param start: begin-datum waarvan data aanwezig moeten zijn
-        :parame end: datum tot data aanwezig meten zijn
+        :param end: datum tot data aanwezig meten zijn
         :return:
         """
         """
@@ -294,7 +297,7 @@ class DAPredictor:
         # get dataframe with knmi-py
         # datetime of latest data-reord
         logging.info(
-            f"KNMI-weerstation: {self.knmi_station} {knmi.stations[int(self.knmi_station)].name}"
+            f"KNMI-weerstation: {self.knmi_station}"
         )
         first_dt = self.db_da.get_time_border_record("gr", latest=False)
         latest_dt = self.db_da.get_time_border_record("gr", latest=True)
@@ -487,10 +490,8 @@ class DAPredictor:
                     csv_df = csv_df[csv_df["datetime"] >= start_utc]
                     csv_df = csv_df[csv_df["datetime"] <= end_utc]
                     if len(csv_df) > 0:
-                        start = max(start_utc, csv_df["datetime"].iloc[-1])
                         csv_df = csv_df.set_index(csv_df["datetime"], drop=False)
                 else:
-                    start = start_utc
                     csv_df = pd.DataFrame()
             fetch_count = 0
             start = start_utc
@@ -528,8 +529,9 @@ class DAPredictor:
             count += 1
         return result
 
-    def updata_gasprices(self):
-        url = "https://enever.nl/apiv3/gasprijs_laatste30dagen.php?token=3762b807802f28b4fb1dafeda4340c35"
+    def update_gasprices(self):
+        url = (f"https://enever.nl/apiv3/gasprijs_laatste30dagen.php"
+               f"?token=3762b807802f28b4fb1dafeda4340c35")
         """
         {
           "status": "true",
@@ -569,16 +571,16 @@ class DAPredictor:
         now_dt = dt.datetime.now()
         shoud_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
         if now_dt.hour >= 13:
-            shoud_latest_dt +=  dt.timedelta(days=1)
+            shoud_latest_dt += dt.timedelta(days=1)
         if shoud_latest_dt <= latest_dt:
             logging.info(f"Actual Day Ahead prices are present until {latest_dt}. "
                          f"Er worden geen prijzen opgehaald")
         while shoud_latest_dt > latest_dt:
-            get_date = dt.datetime(latest_dt.year, latest_dt.month, latest_dt.day) + dt.timedelta(days=1)
+            get_date = (dt.datetime(latest_dt.year, latest_dt.month, latest_dt.day)
+                        + dt.timedelta(days=1))
             da_prices = DaPrices(self.config, self.db_da)
             da_prices.get_prices("nordpool", _start=get_date)
             latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
-
 
     def _create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -643,7 +645,7 @@ class DAPredictor:
             "values" if classification == CLASSIFICATION_CURRENT else "prognoses"
         )
         for key, data in DATA_TYPES.items():
-            df_data = self.db_da.get_column_data(table_name, data["code"], start, end)
+            df_data = self.db_da.get_column_data(table_name, data["code"], start, end, agg_func="sum")
             if count == 0:
                 result_df = df_data
                 result_df.rename(columns={"value": data["code"]}, inplace=True)
@@ -719,13 +721,9 @@ class DAPredictor:
 
         1. **Statistical outliers**: Z-score > 3 (values more than 3 standard deviations from mean)
         2. **IQR outliers**: Values outside Q1 - 1.5*IQR or Q3 + 1.5*IQR range
-        3. **Physics-based outliers**: Values exceeding theoretical maximum production by hour
 
         A data point is flagged as an outlier only if detected by 2+ methods,
         reducing false positives while catching genuine anomalies.
-
-        Additionally applies seasonal context outlier detection based on the
-        correlation between solar production and irradiance within season-hour groups.
 
         Args:
             merged_data: Merged weather and solar data
@@ -774,14 +772,10 @@ class DAPredictor:
             # - Different latitudes (seasonal variation)
             # - Local climate conditions
 
-            # Use configurable physics-based constraints
-            physics_outliers = solar_values > self.max_hourly_production.get(hour, 5.5)
-
             # Combine methods (outlier if flagged by 2+ methods)
             combined_outliers = (
                 statistical_outliers.astype(int)
                 + iqr_outliers.astype(int)
-                + physics_outliers.astype(int)
             ) >= 2
 
             outlier_mask.loc[hour_data.index] = combined_outliers
@@ -876,7 +870,7 @@ class DAPredictor:
 
         # historic weighting
         def weight(val):
-            wf = (val.timestamp() - start_ts) / (30 * 24 * 60)
+            # wf = (val.timestamp() - start_ts) / (30 * 24 * 60)
             return 1  # wf
 
         ned_nl_df["weight"] = ned_nl_df.index.to_series().apply(weight)
@@ -1039,12 +1033,8 @@ class DAPredictor:
     ) -> Union[float, np.ndarray]:
         """
         Make predictions using the trained model.
-
         Args:
-            ned_nl_data: Either a dictionary with single prediction data or DataFrame with multiple predictions
-                        For single prediction (dict), required keys: temperature, irradiance, datetime
-                        For batch prediction (DataFrame), required columns: temperature, irradiance, datetime
-
+            ned_nl_data
         Returns:
             Predicted solar production in kWh
         """
@@ -1129,7 +1119,6 @@ class DAPredictor:
         """
         haalt da_data op uit DAO database
         :param start: begindatum
-        :param entities: list van sensoren van ha
         :return:
         """
 
@@ -1213,7 +1202,7 @@ class DAPredictor:
             self.load_model(model_path=self.model_save_path)
         else:
             raise FileNotFoundError(
-                f"Er is geen model aanwezig voor {self.solar_name},svp eerst trainen."
+                f"Er is geen model aanwezig,svp eerst trainen."
             )
         # latest_dt = self.db_da.get_time_border_record("gr", latest=True, table_name="prognoses")
         # prognose = latest_dt < end
@@ -1223,8 +1212,6 @@ class DAPredictor:
         ned_nl_data = self.calc_netto_fossile(ned_nl_data)
 
         prediction = self.predict(ned_nl_data)
-        # prediction["datetime"] = prediction["date_time"].apply(lambda x: x - dt.timedelta(seconds=1))
-        # prediction["datetime"] = prediction["datetime"].tz_localize(GRANULARITY_TIMEZONE_CET)
         ned_nl_data["da_prediction"] = prediction["prediction"]
         prediction_df = ned_nl_data
         da_data = self.get_da_data(
@@ -1237,10 +1224,17 @@ class DAPredictor:
 
     def show_prediction(self, start, end):
         prediction, result_df = self.predict_da_price(start, end)
-        from dap.lib.da_graph import GraphBuilder
+        prediction["date_time"] = prediction["date_time"].dt.tz_convert(tz=self.time_zone)
+        prediction.reset_index(drop=True, inplace=True)
+        prediction["time_ts"] = pd.to_datetime(prediction["date_time"], unit="s")
+        prediction["time"] = prediction["date_time"].apply(lambda x: x.strftime("%Y-%m-%d %H:%M%z"))
+        prediction.drop(["date_time"], axis=1, inplace=True)
+        prediction = prediction[["time", "time_ts", "prediction"]]
+        prediction.to_json('../data/prediction.json', orient='records', date_unit="s")
 
+        from dap.lib.da_graph import GraphBuilder
         result_df["time"] = pd.to_datetime(result_df.index).tz_convert(
-            tz="Europe/Amsterdam"
+            tz=self.time_zone
         )
         result_df.reset_index(drop=True, inplace=True)
         uur = []
@@ -1325,7 +1319,7 @@ class DAPredictor:
         plot = g_builder.build(result_df, graph_options)
         now = dt.datetime.now()
         plot.savefig(
-            f"../data/images/da_prediction_{now.strftime('%Y-%m-%d %H:%M')}.png"
+            f"../data/da_prediction.png"
         )
         return plot
 
@@ -1359,14 +1353,14 @@ def main():
     if arg.lower() == "update":
         da_predictor.update_data(classification=CLASSIFICATION_CURRENT)
         da_predictor.update_data(classification=CLASSIFICATION_FORECAST)
-        da_predictor.updata_gasprices()
+        da_predictor.update_gasprices()
         da_predictor.update_prices()
         da_predictor.run_train()
         da_predictor.show_prediction(start=start_dt, end=end_dt)
     if arg.lower() == "show":
         da_predictor.show_prediction(start=start_dt, end=end_dt)
     if arg.lower() == "prices":
-        da_predictor.update_prices(start_dt)
+        da_predictor.update_prices()
 
 
 if __name__ == "__main__":

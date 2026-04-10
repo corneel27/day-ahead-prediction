@@ -110,7 +110,7 @@ class DaPrices:
         if source.lower() == "nordpool":
             # ophalen bij Nordpool
             prices_spot = Prices()
-            if len(sys.argv) <= 2:
+            if (len(sys.argv) <= 2) and (start is None):
                 end_date = None
             else:
                 end_date = start

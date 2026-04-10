@@ -19,5 +19,6 @@
   },
   "graphics": {
     "style": "Solarize_Light2"
-  }
+  },
+  "knmi_station": 260
 }
