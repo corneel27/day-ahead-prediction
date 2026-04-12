@@ -1,0 +1,44 @@
+name: Run Calc Prediction every 6 hour
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # elke 6 uur
+  workflow_dispatch:       # handmatig starten (optioneel)
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # nodig om te kunnen pushen
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run script
+        run: |
+          cd dap/pred
+          python3 da_predictor.py update
+
+      - name: Commit & push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add ../data
+          # pad/naar/jouw/output_directory/
+
+          # Alleen committen als er wijzigingen zijn
+          git diff --cached --quiet || git commit -m "Auto-update generated files"
+
+          git push
