@@ -28,6 +28,7 @@ jobs:
       - name: Run script
         run: |
           cd dap/pred
+          export PYTHONPATH="../..:../../dap:../../dap/lib"
           python3 da_predictor.py update
 
       - name: Commit & push changes
