@@ -27,7 +27,7 @@ jobs:
 
       - name: Run script
         env:
-          ned_nl_api_token: ${{ secrets.NED_NL_API_TOKEN }}
+          NED_NL_API_TOKEN: ${{ secrets.NED_NL_API_TOKEN }}
         run: |
           cd dap/pred
           export PYTHONPATH="../..:../../dap:../../dap/lib"
