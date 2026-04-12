@@ -13,6 +13,7 @@ import sys
 import warnings
 from typing import Union, Dict, Any
 import datetime as dt
+from zoneinfo import ZoneInfo
 import logging
 import copy
 import json
@@ -249,12 +250,12 @@ class DAPredictor:
                     data["code"], latest=True, table_name=table
                 )
             else:
-                latest_record = dt.datetime.now() - dt.timedelta(days=1)
+                latest_record = dt.datetime.now(ZoneInfo(self.time_zone)) - dt.timedelta(days=1)
             if latest_record is None:
                 if classification == CLASSIFICATION_CURRENT:
                     latest_record = dt.datetime(year=2025, month=1, day=1)
                 else:
-                    latest_record = dt.datetime.now() - dt.timedelta(days=1)
+                    latest_record = dt.datetime.now(ZoneInfo(self.time_zone)) - dt.timedelta(days=1)
             logging.info(
                 f"Data van {data['code']} {classification=} aanwezig tot en met {latest_record}"
             )
@@ -334,7 +335,7 @@ class DAPredictor:
         # haal ontbrekende data op bij knmi
 
         if end is None:
-            end = dt.datetime.now()
+            end = dt.datetime.now(ZoneInfo(self.time_zone))
         if not prognose:
             # knmi data evt aanvullen
             self.import_knmi_df(start, end)
@@ -570,7 +571,7 @@ class DAPredictor:
 
     def update_prices(self):
         latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
-        now_dt = dt.datetime.now()
+        now_dt = dt.datetime.now(ZoneInfo(self.time_zone))
         shoud_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
         if now_dt.hour >= 13:
             shoud_latest_dt += dt.timedelta(days=1)
@@ -1319,7 +1320,7 @@ class DAPredictor:
         }
         g_builder = GraphBuilder()
         plot = g_builder.build(result_df, graph_options)
-        now = dt.datetime.now()
+        now = dt.datetime.now(ZoneInfo(self.time_zone))
         plot.savefig(
             f"../data/da_prediction.png"
         )
