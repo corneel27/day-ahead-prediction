@@ -26,6 +26,8 @@ jobs:
           pip install -r dap/requirements.txt
 
       - name: Run script
+        env:
+          ned_nl_api_token: ${{ secrets.ned_nl_api_token }}
         run: |
           cd dap/pred
           export PYTHONPATH="../..:../../dap:../../dap/lib"
