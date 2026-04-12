@@ -249,6 +249,7 @@ class DAPredictor:
                 latest_record = self.db_da.get_time_border_record(
                     data["code"], latest=True, table_name=table
                 )
+                latest_record = latest_record.astimezone(ZoneInfo(self.time_zone))
             else:
                 latest_record = dt.datetime.now(ZoneInfo(self.time_zone)) - dt.timedelta(days=1)
             if latest_record is None:
@@ -303,12 +304,16 @@ class DAPredictor:
             f"KNMI-weerstation: {self.knmi_station}"
         )
         first_dt = self.db_da.get_time_border_record("gr", latest=False)
+        first_dt = first_dt.astimezone(ZoneInfo(self.time_zone))
         latest_dt = self.db_da.get_time_border_record("gr", latest=True)
+        latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
         if latest_dt is None:  # er zijn nog geen data
             logging.info(f"Er zijn nog geen knmi-data aanwezig")
             self.get_and_save_knmi_data(start, end)
             first_dt = self.db_da.get_time_border_record("gr", latest=False)
+            first_dt = first_dt.astimezone(ZoneInfo(self.time_zone))
             latest_dt = self.db_da.get_time_border_record("gr", latest=True)
+            latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
         else:
             logging.info(f"Er zijn knmi-data aanwezig vanaf {first_dt} tot {latest_dt}")
         if first_dt <= start and latest_dt >= end:
@@ -571,21 +576,24 @@ class DAPredictor:
 
     def update_prices(self):
         latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
+        latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
         logging.info(f"Price-data present until {latest_dt}")
         now_dt = dt.datetime.now(ZoneInfo(self.time_zone))
-        shoud_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
-        logging.info(f"Price data zou moeten zijn tot: {shoud_latest_dt}")
+        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
+        should_latest_dt = should_latest_dt.astimezone(ZoneInfo(self.time_zone))
+        logging.info(f"Price data zou moeten zijn tot: {should_latest_dt}")
         if now_dt.hour >= 13:
-            shoud_latest_dt += dt.timedelta(days=1)
-        if shoud_latest_dt <= latest_dt:
+            should_latest_dt += dt.timedelta(days=1)
+        if should_latest_dt <= latest_dt:
             logging.info(f"Actual Day Ahead prices are present until {latest_dt}. "
                          f"Er worden geen prijzen opgehaald")
-        while shoud_latest_dt > latest_dt:
+        while should_latest_dt > latest_dt:
             get_date = (dt.datetime(latest_dt.year, latest_dt.month, latest_dt.day)
                         + dt.timedelta(days=1))
             da_prices = DaPrices(self.config, self.db_da)
             da_prices.get_prices("nordpool", _start=get_date)
             latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
+            latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
 
     def _create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -1210,6 +1218,7 @@ class DAPredictor:
                 f"Er is geen model aanwezig,svp eerst trainen."
             )
         # latest_dt = self.db_da.get_time_border_record("gr", latest=True, table_name="prognoses")
+        # latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
         # prognose = latest_dt < end
         ned_nl_data = self.get_ned_nl_data(
             classification=CLASSIFICATION_FORECAST, start=start, end=end
