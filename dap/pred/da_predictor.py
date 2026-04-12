@@ -571,8 +571,10 @@ class DAPredictor:
 
     def update_prices(self):
         latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
+        logging.info(f"Price-data present until {latest_dt}")
         now_dt = dt.datetime.now(ZoneInfo(self.time_zone))
         shoud_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
+        logging.info(f"Price data zou moeten zijn tot: {shoud_latest_dt}")
         if now_dt.hour >= 13:
             shoud_latest_dt += dt.timedelta(days=1)
         if shoud_latest_dt <= latest_dt:
