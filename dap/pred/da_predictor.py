@@ -136,9 +136,9 @@ class DAPredictor:
         self.forecast_hours: int = 96
         self.config = Config(file_name, secrets_file_name="../data/secrets.json")
         self.config.interval = "1hour"
-        self.ned_nl_api_key = os.getenv("ned_nl_api_token")
+        self.ned_nl_api_key = os.getenv("NED_NL_API_TOKEN")
         if not self.ned_nl_api_key:
-            raise ValueError("API_KEY is not set")
+            raise ValueError("api_key is not set")
         self.db_da = self.config.get_db_da("database_dap")
         self.time_zone = self.config.get("time_zone", None, 'Europe/Amsterdam')
         self.knmi_station = self.config.get("knmi_station", None, '260')
