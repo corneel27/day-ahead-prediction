@@ -38,7 +38,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add ../data
+          git add dap/data
           # pad/naar/jouw/output_directory/
 
           # Alleen committen als er wijzigingen zijn
