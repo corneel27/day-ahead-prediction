@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uv
-          uv pip install -r dap/requirements.txt
+          uv pip install -r dap/requirements.txt --system
 
       - name: Run script
         env:
