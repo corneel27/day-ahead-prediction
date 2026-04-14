@@ -2,7 +2,7 @@ name: Run Calc Prediction every 6 hour
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # elke 6 uur
+    - cron: "0 0,6,12,18 * * *" # utc
   workflow_dispatch:       # handmatig starten (optioneel)
 
 jobs:
