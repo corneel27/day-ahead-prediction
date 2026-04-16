@@ -1231,11 +1231,12 @@ class DAPredictor:
             classification=CLASSIFICATION_CURRENT, start=start, end=end
         )
         prediction_df["da_epex"] = da_data["da"]
-        logging.debug(f"ML prediction: \n{prediction_df.to_string()}")
-        logging.info(prediction)
+        logging.info(f"ML prediction: \n{prediction_df.to_string()}")
         return prediction, prediction_df
 
     def show_prediction(self, start, end):
+        start = start.astimezone(ZoneInfo(self.time_zone))
+        end= end.astimezone(ZoneInfo(self.time_zone))
         prediction, result_df = self.predict_da_price(start, end)
         prediction["date_time"] = prediction["date_time"].dt.tz_convert(tz=self.time_zone)
         prediction.reset_index(drop=True, inplace=True)
@@ -1243,6 +1244,7 @@ class DAPredictor:
         prediction["time"] = prediction["date_time"].apply(lambda x: x.strftime("%Y-%m-%d %H:%M%z"))
         prediction.drop(["date_time"], axis=1, inplace=True)
         prediction = prediction[["time", "time_ts", "prediction"]]
+        logging.debug(f"Prediction.json inhoud: {prediction.to_string()}")
         prediction.to_json('../data/prediction.json', orient='records', date_unit="s")
 
         from dap.lib.da_graph import GraphBuilder
@@ -1271,8 +1273,10 @@ class DAPredictor:
                 uur.append(None)
         result_df["uur"] = uur
         style = self.config.get(["graphics", "style"], None, "")
+        now = dt.datetime.now().astimezone(ZoneInfo(self.time_zone))
         graph_options = {
-            "title": f"Prognose day_ahead prijzen vanaf {start.strftime('%Y-%m-%d %H:%M')}",
+            "title": f"Prognose day_ahead prijzen vanaf {start.strftime('%Y-%m-%d %H:%M')}\n"
+                     f"Berekend op {now.strftime('%Y-%m-%d %H:%M')}",
             "style": style,
             "haxis": {"values": "uur", "title": "uren"},
             "graphs": [
@@ -1346,7 +1350,8 @@ def main():
         arg2 = sys.argv[2]
         start_dt = dt.datetime.strptime(arg2, "%Y-%m-%d")
     else:
-        start_dt = dt.date.today()
+        start_d = dt.date.today()
+        start_dt = dt.datetime(start_d.year, start_d.month, start_d.day)
     if len(sys.argv) > 3:
         arg3 = sys.argv[3]
         end_dt = dt.datetime.strptime(arg3, "%Y-%m-%d")
