@@ -1235,8 +1235,10 @@ class DAPredictor:
         return prediction, prediction_df
 
     def show_prediction(self, start, end):
-        start = start.astimezone(ZoneInfo(self.time_zone))
-        end= end.astimezone(ZoneInfo(self.time_zone))
+        tzinfo = ZoneInfo(self.time_zone)
+        start = dt.datetime(start.year, start.month, start.day, tzinfo=tzinfo)
+        end = dt.datetime(end.year, end.month, end.day, tzinfo=tzinfo)
+        logging.info(f"Start periode: {start.strftime('%Y-%m-%d %H:%M%z')}")
         prediction, result_df = self.predict_da_price(start, end)
         prediction["date_time"] = prediction["date_time"].dt.tz_convert(tz=self.time_zone)
         prediction.reset_index(drop=True, inplace=True)
