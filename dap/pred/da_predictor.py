@@ -13,7 +13,7 @@ import sys
 import warnings
 from typing import Union, Dict, Any
 import datetime as dt
-from zoneinfo import ZoneInfo
+import pytz
 import logging
 import copy
 import json
@@ -142,6 +142,7 @@ class DAPredictor:
             raise ValueError("api_key is not set")
         self.db_da = self.config.get_db_da("database_dap")
         self.time_zone = self.config.get("time_zone", None, 'Europe/Amsterdam')
+        self.local_tz = pytz.timezone(self.time_zone)
         self.knmi_station = self.config.get("knmi_station", None, '260')
 
     def _fetch_ned_nl_data(
@@ -249,14 +250,14 @@ class DAPredictor:
                 latest_record = self.db_da.get_time_border_record(
                     data["code"], latest=True, table_name=table
                 )
-                latest_record = latest_record.astimezone(ZoneInfo(self.time_zone))
+                latest_record = latest_record.astimezone(self.local_tz)
             else:
-                latest_record = dt.datetime.now(ZoneInfo(self.time_zone)) - dt.timedelta(days=1)
+                latest_record = dt.datetime.now(self.local_tz) - dt.timedelta(days=1)
             if latest_record is None:
                 if classification == CLASSIFICATION_CURRENT:
                     latest_record = dt.datetime(year=2025, month=1, day=1)
                 else:
-                    latest_record = dt.datetime.now(ZoneInfo(self.time_zone)) - dt.timedelta(days=1)
+                    latest_record = dt.datetime.now(self.local_tz) - dt.timedelta(days=1)
             logging.info(
                 f"Data van {data['code']} {classification=} aanwezig tot en met {latest_record}"
             )
@@ -304,16 +305,16 @@ class DAPredictor:
             f"KNMI-weerstation: {self.knmi_station}"
         )
         first_dt = self.db_da.get_time_border_record("gr", latest=False)
-        first_dt = first_dt.astimezone(ZoneInfo(self.time_zone))
+        first_dt = first_dt.astimezone(self.local_tz)
         latest_dt = self.db_da.get_time_border_record("gr", latest=True)
-        latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
+        latest_dt = latest_dt.astimezone(self.local_tz)
         if latest_dt is None:  # er zijn nog geen data
             logging.info(f"Er zijn nog geen knmi-data aanwezig")
             self.get_and_save_knmi_data(start, end)
             first_dt = self.db_da.get_time_border_record("gr", latest=False)
-            first_dt = first_dt.astimezone(ZoneInfo(self.time_zone))
+            first_dt = first_dt.astimezone(self.local_tz)
             latest_dt = self.db_da.get_time_border_record("gr", latest=True)
-            latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
+            latest_dt = latest_dt.astimezone(self.local_tz)
         else:
             logging.info(f"Er zijn knmi-data aanwezig vanaf {first_dt} tot {latest_dt}")
         if first_dt <= start and latest_dt >= end:
@@ -340,7 +341,7 @@ class DAPredictor:
         # haal ontbrekende data op bij knmi
 
         if end is None:
-            end = dt.datetime.now(ZoneInfo(self.time_zone))
+            end = dt.datetime.now(self.local_tz)
         if not prognose:
             # knmi data evt aanvullen
             self.import_knmi_df(start, end)
@@ -576,10 +577,10 @@ class DAPredictor:
 
     def update_prices(self):
         latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
-        latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
+        latest_dt = latest_dt.astimezone(self.local_tz)
         logging.info(f"Price-data present until {latest_dt}")
-        now_dt = dt.datetime.now(ZoneInfo(self.time_zone))
-        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23, tzinfo=ZoneInfo(self.time_zone))
+        now_dt = dt.datetime.now(self.local_tz)
+        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23, tzinfo=self.local_tz)
         logging.info(f"Price data zou moeten zijn tot: {should_latest_dt}")
         if now_dt.hour >= 13:
             should_latest_dt += dt.timedelta(days=1)
@@ -592,7 +593,7 @@ class DAPredictor:
             da_prices = DaPrices(self.config, self.db_da)
             da_prices.get_prices("nordpool", _start=get_date)
             latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
-            latest_dt = latest_dt.astimezone(ZoneInfo(self.time_zone))
+            latest_dt = latest_dt.astimezone(self.local_tz)
 
     def _create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -1235,9 +1236,8 @@ class DAPredictor:
         return prediction, prediction_df
 
     def show_prediction(self, start, end):
-        tzinfo = ZoneInfo(self.time_zone)
-        start = dt.datetime(start.year, start.month, start.day, tzinfo=tzinfo)
-        end = dt.datetime(end.year, end.month, end.day, tzinfo=tzinfo)
+        start = dt.datetime(start.year, start.month, start.day, tzinfo=self.local_tz)
+        end = dt.datetime(end.year, end.month, end.day, tzinfo=self.local_tz)
         logging.info(f"Start periode: {start.strftime('%Y-%m-%d %H:%M%z')}")
         prediction, result_df = self.predict_da_price(start, end)
         prediction["date_time"] = prediction["date_time"].dt.tz_convert(tz=self.time_zone)
@@ -1274,8 +1274,9 @@ class DAPredictor:
             else:
                 uur.append(None)
         result_df["uur"] = uur
+        logging.info(f"ML graph_data: \n{result_df.to_string()}")
         style = self.config.get(["graphics", "style"], None, "")
-        now = dt.datetime.now().astimezone(ZoneInfo(self.time_zone))
+        now = dt.datetime.now().astimezone(self.local_tz)
         graph_options = {
             "title": f"Prognose day_ahead prijzen vanaf {start.strftime('%Y-%m-%d %H:%M')}\n"
                      f"Berekend op {now.strftime('%Y-%m-%d %H:%M')}",
@@ -1336,7 +1337,7 @@ class DAPredictor:
         }
         g_builder = GraphBuilder()
         plot = g_builder.build(result_df, graph_options)
-        now = dt.datetime.now(ZoneInfo(self.time_zone))
+        now = dt.datetime.now(self.local_tz)
         plot.savefig(
             f"../data/da_prediction.png"
         )
