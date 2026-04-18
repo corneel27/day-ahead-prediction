@@ -580,7 +580,8 @@ class DAPredictor:
         latest_dt = latest_dt.astimezone(self.local_tz)
         logging.info(f"Price-data present until {latest_dt}")
         now_dt = dt.datetime.now(self.local_tz)
-        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23, tzinfo=self.local_tz)
+        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
+        should_latest_dt = should_latest_dt.astimezone(self.local_tz)
         logging.info(f"Price data zou moeten zijn tot: {should_latest_dt}")
         if now_dt.hour >= 13:
             should_latest_dt += dt.timedelta(days=1)
