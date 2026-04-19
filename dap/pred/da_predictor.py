@@ -13,7 +13,7 @@ import sys
 import warnings
 from typing import Union, Dict, Any
 import datetime as dt
-import pytz
+from zoneinfo import ZoneInfo
 import logging
 import copy
 import json
@@ -142,7 +142,7 @@ class DAPredictor:
             raise ValueError("api_key is not set")
         self.db_da = self.config.get_db_da("database_dap")
         self.time_zone = self.config.get("time_zone", None, 'Europe/Amsterdam')
-        self.local_tz = pytz.timezone(self.time_zone)
+        self.local_tz = ZoneInfo(self.time_zone)
         self.knmi_station = self.config.get("knmi_station", None, '260')
 
     def _fetch_ned_nl_data(
@@ -580,18 +580,20 @@ class DAPredictor:
         latest_dt = latest_dt.astimezone(self.local_tz)
         logging.info(f"Price-data present until {latest_dt}")
         now_dt = dt.datetime.now(self.local_tz)
-        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23)
-        should_latest_dt = should_latest_dt.astimezone(self.local_tz)
+        should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23, tzinfo=self.local_tz)
         logging.info(f"Price data zou moeten zijn tot: {should_latest_dt}")
         if now_dt.hour >= 13:
             should_latest_dt += dt.timedelta(days=1)
         if should_latest_dt <= latest_dt:
             logging.info(f"Actual Day Ahead prices are present until {latest_dt}. "
                          f"Er worden geen prijzen opgehaald")
+        da_prices = DaPrices(self.config, self.db_da)
         while should_latest_dt > latest_dt:
-            get_date = (dt.datetime(latest_dt.year, latest_dt.month, latest_dt.day)
-                        + dt.timedelta(days=1))
-            da_prices = DaPrices(self.config, self.db_da)
+            get_date = latest_dt.astimezone(self.local_tz).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) + dt.timedelta(days=1)
+            # get_date = (dt.datetime(latest_dt.year, latest_dt.month, latest_dt.day)
+            #             + dt.timedelta(days=1))
             da_prices.get_prices("nordpool", _start=get_date)
             latest_dt = self.db_da.get_time_border_record("da", latest=True, table_name="values")
             latest_dt = latest_dt.astimezone(self.local_tz)
