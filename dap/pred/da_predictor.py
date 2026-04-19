@@ -581,9 +581,9 @@ class DAPredictor:
         logging.info(f"Price-data present until {latest_dt}")
         now_dt = dt.datetime.now(self.local_tz)
         should_latest_dt = dt.datetime(now_dt.year, now_dt.month, now_dt.day, hour=23, tzinfo=self.local_tz)
-        logging.info(f"Price data zou moeten zijn tot: {should_latest_dt}")
         if now_dt.hour >= 13:
             should_latest_dt += dt.timedelta(days=1)
+        logging.info(f"Price data zou moeten zijn tot: {should_latest_dt}")
         if should_latest_dt <= latest_dt:
             logging.info(f"Actual Day Ahead prices are present until {latest_dt}. "
                          f"Er worden geen prijzen opgehaald")
@@ -1253,14 +1253,12 @@ class DAPredictor:
         prediction.to_json('../data/prediction.json', orient='records', date_unit="s")
 
         from dap.lib.da_graph import GraphBuilder
-        result_df["time"] = pd.to_datetime(result_df.index).tz_convert(
-            tz=self.time_zone
-        )
+        result_df["datetime"] = result_df["datetime"].dt.tz_convert(tz=self.time_zone)
         result_df.reset_index(drop=True, inplace=True)
         uur = []
         year = 0
         for row in result_df.itertuples():
-            moment = row.time
+            moment = row.datetime
             if moment.hour == 0:
                 if moment.year != year:
                     uur.append(moment.strftime("%Y-%m-%d %H"))
