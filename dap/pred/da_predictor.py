@@ -1243,20 +1243,19 @@ class DAPredictor:
     def show_prediction(self, start, end):
         start = dt.datetime(start.year, start.month, start.day, tzinfo=self.local_tz)
         end = dt.datetime(end.year, end.month, end.day, tzinfo=self.local_tz)
-        logging.info(f"Periode, start: {start.strftime('%Y-%m-%d %H:%M%z')}"
-                     f"einde: {end.strftime('%Y-%m-%d %H:%M%z')}")
+        logging.info(f"Periode, start: {start.strftime('%Y-%m-%d %H:%M %z')}"
+                     f" einde: {end.strftime('%Y-%m-%d %H:%M %z')}")
         prediction, result_df = self.predict_da_price(start, end)
-        prediction["date_time"] = prediction["date_time"].dt.tz_convert(tz=self.time_zone)
         prediction.reset_index(drop=True, inplace=True)
         prediction["time_ts"] = pd.to_datetime(prediction["date_time"], unit="s")
-        prediction["time"] = prediction["date_time"].apply(lambda x: x.strftime("%Y-%m-%d %H:%M%z"))
+        prediction["time"] = prediction["date_time"].apply(lambda x: x.strftime("%Y-%m-%d %H:%M %z"))
         prediction.drop(["date_time"], axis=1, inplace=True)
         prediction = prediction[["time", "time_ts", "prediction"]]
         logging.debug(f"Prediction.json inhoud: {prediction.to_string()}")
         prediction.to_json('../data/prediction.json', orient='records', date_unit="s")
 
         from dap.lib.da_graph import GraphBuilder
-        result_df["datetime"] = result_df["datetime"].dt.tz_convert(tz=self.time_zone)
+        # result_df["datetime"] = result_df["datetime"].dt.tz_convert(tz=self.time_zone)
         result_df.reset_index(drop=True, inplace=True)
         uur = []
         year = 0
