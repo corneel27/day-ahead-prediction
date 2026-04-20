@@ -1248,19 +1248,27 @@ class DAPredictor:
         prediction, result_df = self.predict_da_price(start, end)
         prediction.reset_index(drop=True, inplace=True)
         prediction["time_ts"] = pd.to_datetime(prediction["date_time"], unit="s")
-        prediction["time"] = prediction["date_time"].apply(lambda x: x.strftime("%Y-%m-%d %H:%M %z"))
+        prediction["time"] = prediction["date_time"].dt.strftime(
+            "%Y-%m-%d %H:%M:%S%z").str.replace(
+            r"(\+|\-)(\d{2})(\d{2})$", r"\1\2:\3", regex=True
+        )
         prediction.drop(["date_time"], axis=1, inplace=True)
+        # prediction.rename(columns={"date_time": "time"}, inplace=True)
         prediction = prediction[["time", "time_ts", "prediction"]]
         logging.debug(f"Prediction.json inhoud: {prediction.to_string()}")
         prediction.to_json('../data/prediction.json', orient='records', date_unit="s")
 
         from dap.lib.da_graph import GraphBuilder
+        result_df["datetime"] = result_df["datetime"].dt.strftime(
+            "%Y-%m-%d %H:%M:%S%z").str.replace(
+            r"(\+|\-)(\d{2})(\d{2})$", r"\1\2:\3", regex=True
+        )
         # result_df["datetime"] = result_df["datetime"].dt.tz_convert(tz=self.time_zone)
         result_df.reset_index(drop=True, inplace=True)
         uur = []
         year = 0
         for row in result_df.itertuples():
-            moment = row.datetime
+            moment = dt.datetime.strptime(row.datetime, "%Y-%m-%d %H:%M:%S%z").astimezone(self.local_tz)
             if moment.hour == 0:
                 if moment.year != year:
                     uur.append(moment.strftime("%Y-%m-%d %H"))
