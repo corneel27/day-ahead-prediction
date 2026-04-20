@@ -661,7 +661,7 @@ class DAPredictor:
             "values" if classification == CLASSIFICATION_CURRENT else "prognoses"
         )
         for key, data in DATA_TYPES.items():
-            df_data = self.db_da.get_column_data(table_name, data["code"], start, end, agg_func="sum")
+            df_data = self.db_da.get_column_data(table_name, data["code"], start, end, agg_func=None)
             if count == 0:
                 result_df = df_data
                 result_df.rename(columns={"value": data["code"]}, inplace=True)
@@ -1145,12 +1145,12 @@ class DAPredictor:
         else:
             table_name = "values"
         result_df = self.db_da.get_column_data(
-            table_name, "da", start, end, agg_func="avg"
+            table_name, "da", start, end, agg_func=None
         )
-        result_df["utc"] = pd.to_datetime(result_df["utc"], unit="s", utc=True)
-        result_df = result_df.set_index(result_df["utc"])
-        result_df = result_df.rename(columns={"utc": "datetime", "value": "da"})
-        result_df.drop(["uur", "time", "datasoort"], axis=1, inplace=True)
+        result_df = result_df.rename(columns={"time": "datetime", "value": "da"})
+        result_df = result_df.set_index(result_df["datetime"])
+
+        result_df.drop(["uur", "datasoort"], axis=1, inplace=True)
         return result_df
 
     def calc_netto_fossile(self, ned_nl_df: pd.DataFrame) -> pd.DataFrame:
@@ -1229,6 +1229,7 @@ class DAPredictor:
             classification=CLASSIFICATION_FORECAST, start=start, end=end
         )
         ned_nl_data = self.calc_netto_fossile(ned_nl_data)
+        logging.info(f"ned nl data: \n{ned_nl_data.to_string()}")
 
         prediction = self.predict(ned_nl_data)
         ned_nl_data["da_prediction"] = prediction["prediction"]
@@ -1237,7 +1238,6 @@ class DAPredictor:
             classification=CLASSIFICATION_CURRENT, start=start, end=end
         )
         prediction_df["da_epex"] = da_data["da"]
-        logging.info(f"ML prediction: \n{prediction_df.to_string()}")
         return prediction, prediction_df
 
     def show_prediction(self, start, end):
@@ -1255,7 +1255,7 @@ class DAPredictor:
         prediction.drop(["date_time"], axis=1, inplace=True)
         # prediction.rename(columns={"date_time": "time"}, inplace=True)
         prediction = prediction[["time", "time_ts", "prediction"]]
-        logging.debug(f"Prediction.json inhoud: {prediction.to_string()}")
+        logging.info(f"Prediction.json inhoud: {prediction.to_string()}")
         prediction.to_json('../data/prediction.json', orient='records', date_unit="s")
 
         from dap.lib.da_graph import GraphBuilder
@@ -1263,10 +1263,11 @@ class DAPredictor:
             "%Y-%m-%d %H:%M:%S%z").str.replace(
             r"(\+|\-)(\d{2})(\d{2})$", r"\1\2:\3", regex=True
         )
-        # result_df["datetime"] = result_df["datetime"].dt.tz_convert(tz=self.time_zone)
         result_df.reset_index(drop=True, inplace=True)
+        # logging.info(f"ML prediction: \n{prediction_df.to_string()}")
         uur = []
         year = 0
+        month = 0
         for row in result_df.itertuples():
             # 2026-04-20 02:00:00+02:00
             # 0123456789012

@@ -16,6 +16,7 @@ from sqlalchemy import (
 import sqlalchemy_utils
 import os
 import logging
+from zoneinfo import ZoneInfo
 
 from dap.lib.utils import interpolate
 
@@ -60,6 +61,7 @@ class DBmanagerObj(object):
         self.port = db_port
         self.db_path = db_path
         self.TARGET_TIMEZONE = db_time_zone
+        self.zone_info = ZoneInfo(db_time_zone)
         if self.db_dialect == "mysql":
             self.engine = create_engine(
                 f"mysql+pymysql://{self.user}:{self.password}@"
@@ -527,9 +529,6 @@ class DBmanagerObj(object):
         else:
             time_column = func.min(values_table.c.time).label("time")
             agg_column = func.sum(values_table.c.value).label("value")
-        # test zonder agg
-        time_column = values_table.c.time.label("time")
-        agg_column = values_table.c.value.label("value")
 
         query = select(
             hour_column,
@@ -567,9 +566,8 @@ class DBmanagerObj(object):
             )
         now_ts = datetime.datetime.now().timestamp()
         df["datasoort"] = np.where(df["time"] <= now_ts, "recorded", "expected")
-        df["time"] = df["time"].apply(
-            lambda x: datetime.datetime.fromtimestamp(x).strftime("%Y-%m-%d %H:%M")
-        )
+        df["time"] = (
+            pd.to_datetime(df["time"], unit="s", utc=True).dt.tz_convert(self.TARGET_TIMEZONE))
         return df
 
     def get_consumption(self, start: datetime.datetime, end=datetime.datetime.now()):
