@@ -1268,20 +1268,25 @@ class DAPredictor:
         uur = []
         year = 0
         for row in result_df.itertuples():
-            moment = dt.datetime.strptime(row.datetime, "%Y-%m-%d %H:%M:%S%z").astimezone(self.local_tz)
-            if moment.hour == 0:
-                if moment.year != year:
-                    uur.append(moment.strftime("%Y-%m-%d %H"))
-                    year = moment.year
-                    month = moment.month
+            # 2026-04-20 02:00:00+02:00
+            # 0123456789012
+            moment = row.datetime
+            moment_hour = int(moment[11:13])
+            moment_month = int(moment[5:7])
+            moment_year = int(moment[0:4])
+            if moment_hour == 0:
+                if moment_year != year:
+                    uur.append(moment[0:13])
+                    year = moment_year
+                    month = moment_month
                 else:
-                    if moment.month != month:
-                        uur.append(moment.strftime("%Y-%m-%d %H"))
-                        month = moment.month
+                    if moment_month != month:
+                        uur.append(moment[0:13])
+                        month = moment_month
                     else:
-                        uur.append(moment.strftime("%Y-%m-%d %H"))
-            elif moment.hour % 6 == 0:
-                uur.append(moment.hour)
+                        uur.append(moment[0:13])
+            elif moment_hour % 6 == 0:
+                uur.append(moment_hour)
             else:
                 uur.append(None)
         result_df["uur"] = uur
