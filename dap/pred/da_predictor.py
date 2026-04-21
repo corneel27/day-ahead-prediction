@@ -671,8 +671,10 @@ class DAPredictor:
         # result_df["utc_s"] = result_df["utc"]
         result_df["datetime"] = pd.to_datetime(result_df["utc"], unit="s",
                                                utc=True).dt.tz_convert(self.time_zone)
-        result_df["utc"] = pd.to_datetime(result_df["utc"], unit="s", utc=True)
+        # result_df["utc"] = pd.to_datetime(result_df["utc"], unit="s", utc=True)
         result_df = result_df.set_index(result_df["datetime"])
+        if classification == CLASSIFICATION_FORECAST:
+            logging.info(f"ned nl data: \n{result_df.to_string()}")
         result_df.drop(["uur", "time", "datasoort", "utc"], axis=1, inplace=True)
         return result_df
 
@@ -1241,8 +1243,8 @@ class DAPredictor:
         return prediction, prediction_df
 
     def show_prediction(self, start, end):
-        start = dt.datetime(start.year, start.month, start.day, tzinfo=self.local_tz)
-        end = dt.datetime(end.year, end.month, end.day, tzinfo=self.local_tz)
+        start = dt.datetime(start.year, start.month, start.day, hour=0, minute=0, tzinfo=self.local_tz)
+        end = dt.datetime(end.year, end.month, end.day, hour=0, minute=0, tzinfo=self.local_tz)
         logging.info(f"Periode, start: {start.strftime('%Y-%m-%d %H:%M %z')}"
                      f" einde: {end.strftime('%Y-%m-%d %H:%M %z')}")
         prediction, result_df = self.predict_da_price(start, end)

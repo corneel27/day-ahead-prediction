@@ -500,9 +500,11 @@ class DBmanagerObj(object):
         """
         if start is None:
             start = datetime.datetime.now()
-        start = start.strftime("%Y-%m-%d %H:%M")
-        if end is not None:
-            end = end.strftime("%Y-%m-%d %H:%M")
+        # start = start.strftime("%Y-%m-%d %H:%M")
+        # if end is not None:
+        #     end = end.strftime("%Y-%m-%d %H:%M")
+        logging.info(f"get_column_data: column_name {column_name}, "
+                     f"Start: {start}, end: {end}")
         """
         #  old style sql query
         sqlQuery = (
@@ -539,7 +541,7 @@ class DBmanagerObj(object):
             and_(
                 variabel_table.c.code == column_name,
                 values_table.c.variabel == variabel_table.c.id,
-                values_table.c.time >= self.unix_timestamp(start),
+                values_table.c.time >= int(start.timestamp()),
             )
         )
         """
@@ -547,7 +549,7 @@ class DBmanagerObj(object):
             query = query.group_by("uur", "time")
         """
         if end is not None:
-            query = query.where(values_table.c.time < self.unix_timestamp(end))
+            query = query.where(values_table.c.time < int(end.timestamp()))  # self.unix_timestamp(end))
         query = query.order_by("time")
 
         with self.engine.connect() as connection:
