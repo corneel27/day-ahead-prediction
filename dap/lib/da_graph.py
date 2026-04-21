@@ -215,11 +215,16 @@ class GraphBuilder:
                             linestyle = serie["linestyle"]
                         else:
                             linestyle = "solid"
+                        if "width" in serie:
+                            linewidth = serie["width"]
+                        else:
+                            linewidth = 1.5
                         plot = ax_serie.plot(
                             ind,
                             data_array,
                             label=label,
                             linestyle=linestyle,
+                            linewidth=linewidth,
                             color=color,
                         )[0]
                     elif s_type == "step":
@@ -227,6 +232,10 @@ class GraphBuilder:
                             linestyle = serie["linestyle"]
                         else:
                             linestyle = "solid"
+                        if "width" in serie:
+                            linewidth = serie["width"]
+                        else:
+                            linewidth = 1.5
                         data_array.append(data_array[-1])
                         ind_serie = np.arange(len(ind) + 1)
                         plot = ax_serie.step(
@@ -234,6 +243,7 @@ class GraphBuilder:
                             data_array,
                             label=label,
                             linestyle=linestyle,
+                            linewidth=linewidth,
                             color=color,
                             where="post",
                         )[0]

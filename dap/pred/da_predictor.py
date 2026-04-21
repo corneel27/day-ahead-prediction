@@ -18,6 +18,7 @@ import logging
 import copy
 import json
 import requests
+from sqlalchemy_utils.types import weekdays
 
 from da_config import Config
 from dap.lib.da_prices import DaPrices
@@ -727,7 +728,7 @@ class DAPredictor:
         elif not isinstance(da_df.index, pd.DatetimeIndex):
             raise ValueError("DA data must have a 'datetime' column or DatetimeIndex")
 
-        # Ensure solar_kwh column exists
+        # Ensure da column exists
         if "da" not in da_df.columns:
             raise ValueError("DA data must contain 'da' column")
 
@@ -1079,7 +1080,7 @@ class DAPredictor:
             # Extract features and make prediction
             features = processed_df[self.feature_columns].iloc[0:1]
             prediction = self.model.predict(features)[0]
-            return max(0, prediction)  # Ensure non-negative
+            return prediction
 
         else:
             # Multiple predictions
@@ -1095,7 +1096,6 @@ class DAPredictor:
                 prediction = []
             else:
                 prediction = self.model.predict(featured_df)
-            prediction = np.maximum(0, prediction)  # Ensure non-negative
             result = pd.DataFrame(
                 {"date_time": featured_df.index, "prediction": prediction}
             )
@@ -1266,28 +1266,32 @@ class DAPredictor:
             r"(\+|\-)(\d{2})(\d{2})$", r"\1\2:\3", regex=True
         )
         result_df.reset_index(drop=True, inplace=True)
+        result_df["prod_totaal"] = result_df["prod_zon"] + result_df["prod_wind"] + result_df["prod_zeewind"]
         # logging.info(f"ML prediction: \n{prediction_df.to_string()}")
         uur = []
         year = 0
         month = 0
+        weekdays = ["ma", "di", "wo", "do", "vr", "za", "zo"]
         for row in result_df.itertuples():
             # 2026-04-20 02:00:00+02:00
             # 0123456789012
             moment = row.datetime
+            moment_dt = dt.datetime.strptime(moment, "%Y-%m-%d %H:%M:%S%z")
+            weekday = weekdays[moment_dt.weekday()]
             moment_hour = int(moment[11:13])
             moment_month = int(moment[5:7])
             moment_year = int(moment[0:4])
             if moment_hour == 0:
                 if moment_year != year:
-                    uur.append(moment[0:13])
+                    uur.append(weekday+ " " + moment[0:13])
                     year = moment_year
                     month = moment_month
                 else:
                     if moment_month != month:
-                        uur.append(moment[0:13])
+                        uur.append(weekday+ " " + moment[0:13])
                         month = moment_month
                     else:
-                        uur.append(moment[0:13])
+                        uur.append(weekday+ " " + moment[0:13])
             elif moment_hour % 6 == 0:
                 uur.append(moment_hour)
             else:
@@ -1331,6 +1335,22 @@ class DAPredictor:
                             "name": "Zon",
                             "type": "stacked",
                             "color": "orange",
+                            "width": 1,
+                        },
+                        {
+                            "column": "cons",
+                            "name": "Verbruik",
+                            "type": "line",
+                            "linestyle": "dashed",
+                            "color": "yellow",
+                            "width": 1,
+                        },
+                        {
+                            "column": "prod_totaal",
+                            "name": "Productie totaal",
+                            "type": "line",
+                            "linestyle": "dashed",
+                            "color": "green",
                             "width": 1,
                         },
                     ],
