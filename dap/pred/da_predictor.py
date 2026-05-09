@@ -272,6 +272,9 @@ class DAPredictor:
                     first_date,
                     tot,
                 )
+                if latest_record == []:
+                    break
+
                 if (
                     pd.Timestamp(latest_record).timestamp()
                     < pd.Timestamp(first_date).timestamp()
@@ -1340,7 +1343,7 @@ class DAPredictor:
                         {
                             "column": "cons",
                             "name": "Verbruik",
-                            "type": "line",
+                            "type": "step",
                             "linestyle": "dashed",
                             "color": "yellow",
                             "width": 1,
@@ -1348,7 +1351,7 @@ class DAPredictor:
                         {
                             "column": "prod_totaal",
                             "name": "Productie totaal",
-                            "type": "line",
+                            "type": "step",
                             "linestyle": "dashed",
                             "color": "green",
                             "width": 1,
