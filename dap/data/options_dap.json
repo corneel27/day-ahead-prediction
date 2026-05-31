@@ -20,5 +20,6 @@
   "graphics": {
     "style": "Solarize_Light2"
   },
+  "prediction_horizon": 6,
   "knmi_station": 260
 }

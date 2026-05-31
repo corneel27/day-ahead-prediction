@@ -145,6 +145,7 @@ class DAPredictor:
         self.time_zone = self.config.get("time_zone", None, 'Europe/Amsterdam')
         self.local_tz = ZoneInfo(self.time_zone)
         self.knmi_station = self.config.get("knmi_station", None, '260')
+        self.horizon = self.config.get("prediction_horizon", None, 6)
 
     def _fetch_ned_nl_data(
         self,
@@ -1397,12 +1398,12 @@ def main():
     else:
         start_d = dt.date.today()
         start_dt = dt.datetime(start_d.year, start_d.month, start_d.day)
+    da_predictor = DAPredictor(file_name="../data/options_dap.json")
     if len(sys.argv) > 3:
         arg3 = sys.argv[3]
         end_dt = dt.datetime.strptime(arg3, "%Y-%m-%d")
     else:
-        end_dt = start_dt + dt.timedelta(days=7)
-    da_predictor = DAPredictor(file_name="../data/options_dap.json")
+        end_dt = start_dt + dt.timedelta(days=da_predictor.horizon)
     if arg.lower() == "train":
         da_predictor.run_train()
     if arg.lower() == "predict":
