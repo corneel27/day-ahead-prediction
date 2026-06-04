@@ -35,12 +35,16 @@ class Config:
             self.secrets = {}
 
     def get(
-        self, keys: list, options: dict = None, default=None
+        self, keys: list|str, options: dict = None, default=None
     ) -> str | dict | list | None:
         if options is None:
             options = self.options
-        if keys[0] in options:
-            result = options[keys[0]]
+        if type(keys) is list:
+            key = keys[0]
+        else:
+            key = keys
+        if key in options:
+            result = options[key]
             if str(result).lower().find("!secret", 0) == 0:
                 result = self.secrets[result[8:]]
             if type(result) is dict:

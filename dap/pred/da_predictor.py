@@ -146,6 +146,7 @@ class DAPredictor:
         self.local_tz = ZoneInfo(self.time_zone)
         self.knmi_station = self.config.get("knmi_station", None, '260')
         self.horizon = self.config.get("prediction_horizon", None, 6)
+        self.training_history = self.config.get("training_history", None, 365)
 
     def _fetch_ned_nl_data(
         self,
@@ -1169,7 +1170,7 @@ class DAPredictor:
         )
         return result
 
-    def run_train(self):
+    def run_train(self, training_history: int=365 ):
         """
         traint alle gedefinieerde ml-objecten
         :param start: optionele begindatum om te trainen, anders een jaar geleden
@@ -1179,7 +1180,7 @@ class DAPredictor:
         now = dt.datetime.today()
 
         end = now
-        start = end - dt.timedelta(days=365)
+        start = end - dt.timedelta(days=training_history)
         """
         start = now
         end = now + dt.timedelta(days=6)
@@ -1419,7 +1420,8 @@ def main():
         da_predictor.update_data(classification=CLASSIFICATION_FORECAST)
         da_predictor.update_gasprices()
         da_predictor.update_prices()
-        da_predictor.run_train()
+
+        da_predictor.run_train(da_predictor.training_history)
         da_predictor.show_prediction(start=start_dt, end=end_dt)
     if arg.lower() == "show":
         da_predictor.show_prediction(start=start_dt, end=end_dt)
